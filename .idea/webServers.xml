@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="429f189b-8807-4111-a254-3b134f1366f9" name="autogluon_test">
+        <fileTransfer accessType="SFTP" host="127.0.0.1" port="10023" sshConfigId="97df64fd-d4bd-4891-a15e-d5a5fc4170f8" sshConfig="root@127.0.0.1:10023 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>
