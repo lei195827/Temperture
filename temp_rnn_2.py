@@ -69,6 +69,63 @@ class RNN_2(nn.Module):
         return out
 
 
+class BiRNN(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, fc_size):
+        super(BiRNN, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.rnn = nn.RNN(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        self.fc1 = nn.Linear(hidden_size * 2, fc_size)  # 添加额外的全连接层
+        self.fc2 = nn.Linear(fc_size, output_size)  # 输出层
+        self.bn1 = nn.BatchNorm1d(num_features=hidden_size * 2)
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # 初始化双向 RNN 的初始状态
+        out, _ = self.rnn(x, h0)
+        out = out[:, -1, :]  # 取最后一个时间步的输出
+        out = F.relu(self.fc1(out))  # 使用ReLU激活函数传递到第一个全连接层
+        out = self.fc2(out)  # 传递到输出层
+        return out
+
+
+class GRU(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, fc_size):
+        super(GRU, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True)
+        self.fc1 = nn.Linear(hidden_size, fc_size)  # 添加额外的全连接层
+        self.fc2 = nn.Linear(fc_size, output_size)  # 输出层
+        self.bn1 = nn.BatchNorm1d(num_features=hidden_size)
+
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        out, _ = self.gru(x, h0)
+        out = out[:, -1, :]  # 取最后一个时间步的输出
+        out = F.relu(self.fc1(out))  # 使用ReLU激活函数传递到第一个全连接层
+        out = self.fc2(out)  # 传递到输出层
+        return out
+
+
+class BiGRU(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, fc_size):
+        super(BiGRU, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.gru = nn.GRU(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        self.fc1 = nn.Linear(hidden_size * 2, fc_size)  # 添加额外的全连接层，注意输入维度要乘以2
+        self.fc2 = nn.Linear(fc_size, output_size)  # 输出层
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # 注意隐藏状态的维度也要乘以2
+        out, _ = self.gru(x, h0)
+        out = out[:, -1, :]  # 取最后一个时间步的输出
+        out = F.relu(self.fc1(out))  # 使用ReLU激活函数传递到第一个全连接层
+        out = self.fc2(out)  # 传递到输出层
+        return out
+
+
 class LSTM(nn.Module):
     def __init__(self, input_size, hidden_size, num_layers, output_size, fc_size):
         super(LSTM, self).__init__()
@@ -81,6 +138,25 @@ class LSTM(nn.Module):
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         c0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
+        out, _ = self.lstm(x, (h0, c0))
+        out = out[:, -1, :]  # 取最后一个时间步的输出
+        out = F.relu(self.fc1(out))  # 使用ReLU激活函数传递到第一个全连接层
+        out = self.fc2(out)  # 传递到输出层
+        return out
+
+
+class BiLSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, fc_size):
+        super(BiLSTM, self).__init__()
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers, batch_first=True, bidirectional=True)
+        self.fc1 = nn.Linear(hidden_size * 2, fc_size)  # 添加额外的全连接层（注意输出特征数变为 hidden_size*2）
+        self.fc2 = nn.Linear(fc_size, output_size)  # 输出层
+
+    def forward(self, x):
+        h0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # 注意 h0 需要是双向 LSTM 的形状
+        c0 = torch.zeros(self.num_layers * 2, x.size(0), self.hidden_size).to(x.device)  # 注意 c0 需要是双向 LSTM 的形状
         out, _ = self.lstm(x, (h0, c0))
         out = out[:, -1, :]  # 取最后一个时间步的输出
         out = F.relu(self.fc1(out))  # 使用ReLU激活函数传递到第一个全连接层
@@ -152,7 +228,9 @@ def get_number(filename):
 if __name__ == '__main__':
     # 读取文件路径和表名
     train_folder = "train/"
-    test_xls = "test/27.xls"
+    test_xls = "test/20.xls"
+    # 是否将验证集放到数据集中
+    NotVal = True
     ori_train_files = [os.path.join(train_folder, f) for f in os.listdir(train_folder) if
                        os.path.isfile(os.path.join(train_folder, f)) and os.path.splitext(f)[1] == ".xls"]
     train_files = sorted(ori_train_files, key=get_number)
@@ -160,7 +238,7 @@ if __name__ == '__main__':
     # 将所有数据拼接成一个 DataFrame
     train_data = pd.DataFrame()
     for file in train_files:
-        if os.path.basename(file) != os.path.basename(test_xls):
+        if os.path.basename(file) != os.path.basename(test_xls) or NotVal:
             df = pd.read_excel(file, sheet_name="data", skiprows=list(range(1, 300)))
             df = df.loc[:, ~df.columns.isin([' Brightness', ' Show Time', " fixed humidity", ' fixed temperature'])]
             train_data = pd.concat([train_data, df])
@@ -208,7 +286,7 @@ if __name__ == '__main__':
     output_size = 1
     sequence_length = 50
     batch_size = 256
-    epoches = 50
+    epoches = 100
     fc_size = 8
     lr = 0.0001
     momentum = 0.9

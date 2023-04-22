@@ -110,15 +110,15 @@ def get_number(filename):
 if __name__ == '__main__':
     # 读取文件路径和表名
     train_folder = "train/"
-    test_xls = "test/27.xls"
+    test_xls = "test/20.xls"
     ori_train_files = [os.path.join(train_folder, f) for f in os.listdir(train_folder) if
                        os.path.isfile(os.path.join(train_folder, f)) and os.path.splitext(f)[1] == ".xls"]
     train_files = sorted(ori_train_files, key=get_number)
     print(train_files)
     # 将所有数据拼接成一个 DataFrame
     train_data = pd.DataFrame()
-    for file in train_files:
-        if os.path.basename(file) != os.path.basename(test_xls):
+    for file in train_files :
+        if os.path.basename(file) != os.path.basename(test_xls) or True:
             df = pd.read_excel(file, sheet_name="data", skiprows=list(range(1, 300)))
             df = df.loc[:, ~df.columns.isin([' Brightness', ' Show Time', " fixed humidity", ' fixed temperature'])]
             train_data = pd.concat([train_data, df])
@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
     train_dataloader = DataLoader(train_dataset, batch_size=256, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=256, shuffle=False)
-    epoches = 20
+    epoches = 40
     test_loss_values = []
     predit_values = []
     model = train_and_evaluate(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader,

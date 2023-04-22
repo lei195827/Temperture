@@ -11,7 +11,7 @@ import itertools
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 
-from temp_rnn_2 import RNN, RNN_2, LSTM
+from temp_rnn_2 import RNN, RNN_2, LSTM, GRU
 
 
 def load_test_data_rnn(test_xls, scaler, device, column_xls, sequence_length=50):
@@ -34,16 +34,17 @@ def load_test_data_rnn(test_xls, scaler, device, column_xls, sequence_length=50)
     return input_tensor_rnn, output
 
 
-def load_model_rnn(model_rnn_path, input_size=8, hidden_size=16, num_layers=1, output_size=1, fc_size=8):
+def load_model_rnn(model_rnn_path, input_size=8, hidden_size=16, num_layers=1, output_size=1, fc_size=8, net=RNN_2):
     """加载已训练好的PyTorch模型，并将其移动到可用的设备上"""
     # 创建RNN模型
-    model_rnn = RNN_2(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers
-                      , output_size=output_size, fc_size=fc_size).cuda()
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    model_rnn = net(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers
+                    , output_size=output_size, fc_size=fc_size).to(device)
     # model = RNN_2(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers
     #               , output_size=output_size,fc_size=fc_size).cuda()
     model_rnn.load_state_dict(torch.load(model_rnn_path))
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
     model_rnn.eval()
     return model_rnn, device
 
@@ -88,10 +89,10 @@ if __name__ == '__main__':
     num_layers = 2
     output_size = 1
     # 加载已经训练好的模型
-    model_rnn, device = load_model_rnn(model_rnn_path='model_rnn.pth', input_size=input_size,
+    model_rnn, device = load_model_rnn(model_rnn_path='model_gru.pth', input_size=input_size,
                                        hidden_size=hidden_size,
                                        num_layers=num_layers, fc_size=fc_size,
-                                       output_size=output_size)
+                                       output_size=output_size, net=GRU)
     test_xls = "test/11.xls"
 
     input_tensor_rnn, output = load_test_data_rnn(test_xls, scaler, device, column_xls='columns.xlsx',
@@ -107,6 +108,3 @@ if __name__ == '__main__':
     plt.legend()
     plt.show()
     add_predict_data(test_xls=test_xls, output_data_list=output_data_list, sequence_length=sequence_length)
-
-
-
