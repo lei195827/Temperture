@@ -32,9 +32,11 @@ if __name__ == '__main__':
     input_size = 8
     hidden_size = 8
     fc_size = 8
+
+
     num_layers = 2
     output_size = 1
-    test_xls = "test/20.xls"
+    test_xls = "test/12.xls"
     # 加载已经训练好的模型
     model_mlp, device = predict_xls_mlp.load_model_mlp('model_mlp.pth', input_size=input_size)
     model_rnn, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_rnn.pth', input_size=input_size,
@@ -64,7 +66,7 @@ if __name__ == '__main__':
                                                        input_size=input_size)
 
     # 可视化预测结果和原始值
-    plot_length = 8000
+    plot_length = 6000
     index_rnn = range(sequence_length - 1, min(plot_length, len(rnn_out) + sequence_length - 1))
     index_mlp = range(min(plot_length, len(mlp_out)))
     np_mlp_out_all = np.asarray(mlp_out).reshape(-1)
@@ -85,23 +87,6 @@ if __name__ == '__main__':
     hybrid_out[:sequence_length] = np_mlp_out[:sequence_length]
     hybrid_out[sequence_length:] = rnn_ratio * np_rnn_out_all[:] + mlp_ratio * np_mlp_out_all[sequence_length:] \
                                    + gru_ratio * np_gru_out_all[:] + lstm_ratio * np_lstm_out_all[:]
-    # 计算MLP和RNN在预测结果中所占的比例
-
-    plt.plot(index_rnn, np_rnn_out[:plot_length - (sequence_length - 1)], label='RNN_GT_Temp')
-    plt.plot(index_rnn, np_gru_out[:plot_length - (sequence_length - 1)], label='GRU_GT_Temp')
-    plt.plot(index_rnn, np_lstm_out[:plot_length - (sequence_length - 1)], label='LSTM_GT_Temp')
-
-    if np.any(output):
-        plt.plot(index_mlp, output[:plot_length], label='GT_Temp')
-    else:
-        print("all of output if '0'")
-    plt.plot(index_mlp, np_mlp_out[:], label='MLP_GT_Temp')
-    plt.plot(index_mlp, hybrid_out[:plot_length], label='Hybrid_GT_Temp')
-    plt.legend()
-    plt.savefig(os.path.join("result", f'{Path(test_xls).stem}_{plot_length}.png'), dpi=300,
-                bbox_inches='tight')  # 保存图片为png格式，分辨率为300，裁剪掉多余的空白
-    plt.show()
-
     # 计算每个预测数组和其对应的真实值数组之间的均方根损失
     mlp_rmse = mean_squared_error(output, np_mlp_out_all, squared=False)
     rnn_rmse = mean_squared_error(output[sequence_length:], np_rnn_out_all,
@@ -111,6 +96,38 @@ if __name__ == '__main__':
     lstm_rmse = mean_squared_error(output[sequence_length:], np_lstm_out_all,
                                    squared=False)
     hybrid_rmse = mean_squared_error(output[:], hybrid_out[:], squared=False)
+
+    # 创建画布和两个子图
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 8))
+
+    ax1.plot(index_rnn, np_rnn_out[:plot_length - (sequence_length - 1)], label='RNN_Temp')
+    ax1.plot(index_rnn, np_gru_out[:plot_length - (sequence_length - 1)], label='GRU_Temp')
+    ax1.plot(index_rnn, np_lstm_out[:plot_length - (sequence_length - 1)], label='LSTM_Temp')
+
+    if np.any(output):
+        ax1.plot(index_mlp, output[:plot_length], label='GT_Temp')
+    else:
+        print("all of output if '0'")
+    ax1.plot(index_mlp, np_mlp_out[:], label='MLP_Temp')
+    ax1.plot(index_mlp, hybrid_out[:plot_length], label='Hybrid_Temp')
+    ax1.legend()
+
+    # 在第二个子图中绘制表格
+    table_data = [['Model', 'RMSE'],
+                  ['MLP', f'{mlp_rmse:.3f}'],
+                  ['RNN', f'{rnn_rmse:.3f}'],
+                  ['GRU', f'{gru_rmse:.3f}'],
+                  ['LSTM', f'{lstm_rmse:.3f}'],
+                  ['Hybrid', f'{hybrid_rmse:.3f}']]
+    ax2.axis('off')
+    ax2.table(cellText=table_data, colLabels=None, cellLoc='center', loc='center')
+
+    # 调整布局
+    plt.subplots_adjust(hspace=0)
+
+    plt.savefig(os.path.join("result", f'{Path(test_xls).stem}_{plot_length}.png'), dpi=300,
+                bbox_inches='tight')  # 保存图片为png格式，分辨率为300，裁剪掉多余的空白
+    plt.show()
 
     # 打印均方根损失
     print(f'MLP RMSE:{mlp_rmse:.3f}')

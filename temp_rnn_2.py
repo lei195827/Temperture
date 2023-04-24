@@ -98,7 +98,6 @@ class GRU(nn.Module):
         self.fc2 = nn.Linear(fc_size, output_size)  # 输出层
         self.bn1 = nn.BatchNorm1d(num_features=hidden_size)
 
-
     def forward(self, x):
         h0 = torch.zeros(self.num_layers, x.size(0), self.hidden_size).to(x.device)
         out, _ = self.gru(x, h0)
@@ -228,7 +227,7 @@ def get_number(filename):
 if __name__ == '__main__':
     # 读取文件路径和表名
     train_folder = "train/"
-    test_xls = "test/20.xls"
+    test_xls = "test/27.xls"
     # 是否将验证集放到数据集中
     NotVal = True
     ori_train_files = [os.path.join(train_folder, f) for f in os.listdir(train_folder) if
@@ -293,8 +292,10 @@ if __name__ == '__main__':
     weight_decay = 2e-5
     # 创建RNN模型
 
-    model = RNN_2(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size
-                  , fc_size=fc_size).cuda()
+
+
+    model = BiRNN(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, output_size=output_size
+                  , fc_size=fc_size,).cuda()
     # criterion = nn.MSELoss()
     # 定义优化器
     criterion = nn.L1Loss()
@@ -312,5 +313,5 @@ if __name__ == '__main__':
     model = train_and_evaluate(model=model, train_dataloader=train_dataloader, test_dataloader=test_dataloader,
                                optimizer=optimizer,
                                criterion=criterion, epoches=epoches, sequence_length=sequence_length)
-    torch.save(model.state_dict(), "model_rnn.pth")
+    torch.save(model.state_dict(), "model_rnn_stable.pth")
     print(f'save model success')

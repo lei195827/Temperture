@@ -1,81 +1,25 @@
+# encoding:utf-8
 import os
-
-import torch
 import pandas as pd
+import predict_rnn_xls
+import predict_xls_mlp
 import numpy as np
 from joblib import load
+from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
+from pathlib import Path
 
-from temp2 import MLP
-import itertools
-from sklearn.preprocessing import StandardScaler
-from torch import nn
-
-from temp_rnn_2 import RNN, RNN_2, LSTM, GRU
-from temp_rnn_3 import process_data
+from temp_rnn_3 import GRU, RNN_2, LSTM, BiGRU, BiRNN, BiLSTM
 
 
-def load_test_data_rnn(test_xls, scaler, device, column_xls, sequence_length=50):
-    df_test = pd.read_excel(column_xls, sheet_name="Sheet1")
-    test_data = pd.read_excel(test_xls, sheet_name="data")
-    test_data = process_data(test_data)
-    test_data = pd.concat([test_data, df_test])
-    test_data = test_data.loc[:,
-                ~test_data.columns.isin([' Brightness', ' Show Time', " fixed humidity", ' fixed temperature'])]
-    test_data = test_data.fillna(0)
-    print(test_data.columns)
-    output = test_data["GT_Temp"]
-    input_tensor_rnn = []
-    print(test_data)
-    input_date = test_data.loc[:, ~test_data.columns.isin(["GT_Temp"])]
-    input_data_scaled = scaler.transform(input_date)
-    input_data_scaled = np.array(input_data_scaled)  # add this line
-    for i in range(len(input_data_scaled) - sequence_length):
-        input_tensor_rnn.append(input_data_scaled[i:i + sequence_length])
-    input_tensor_rnn = torch.tensor(input_tensor_rnn).float().to(device)
-    return input_tensor_rnn, output
-
-
-def load_model_rnn(model_rnn_path, input_size=8, hidden_size=16, num_layers=1, output_size=1, fc_size=8, net=RNN_2):
-    """加载已训练好的PyTorch模型，并将其移动到可用的设备上"""
-    # 创建RNN模型
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    model_rnn = net(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers
-                    , output_size=output_size, fc_size=fc_size).to(device)
-    # model = RNN_2(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers
-    #               , output_size=output_size,fc_size=fc_size).cuda()
-    model_rnn.load_state_dict(torch.load(model_rnn_path))
-
-
-    model_rnn.eval()
-    return model_rnn, device
-
-
-def predict_temperature_rnn(model, input_tensor_rnn, sequence_length=50, input_size=8):
-    """使用已经训练好的模型预测输入数据的温度值"""
-    output_data_list = []
-    with torch.no_grad():
-        for input_data in input_tensor_rnn:
-            input_data = input_data.view(-1, sequence_length, input_size)
-            output_rnn = model(input_data)
-            output_data_list.append(output_rnn.detach().cpu().numpy())
-
-    for output_data in output_data_list:
-        print(output_data)
-    return output_data_list
-
-
-def add_predict_data(test_xls, output_data_list, sequence_length=50):
+def add_predict_data(test_xls, output_data_list):
     # 分割文件名和扩展名
     name, ext = os.path.splitext(test_xls)
     # 读取xls文件为DataFrame对象
     df = pd.read_excel(test_xls)
     # 给DataFrame对象添加新列，赋值为一个列表
-    output_data_list = list(itertools.chain(*output_data_list))
-    # 从第50个开始写入
-    output_data_iter = iter(output_data_list)
-    for i in range(sequence_length, len(df)):
-        df.loc[i, 'predict_data'] = next(output_data_iter)
+    for i in range(len(df)):
+        df.loc[i, 'predict_data'] = output_data_list[i]
     # 把修改后的DataFrame对象保存回xls文件
     new_name = name + '_pre' + ext
     df.to_excel(new_name)
@@ -83,30 +27,114 @@ def add_predict_data(test_xls, output_data_list, sequence_length=50):
 
 if __name__ == '__main__':
     # 加载保存的scaler对象
-    scaler = load('scaler_time.joblib')
+    scaler = load('scaler.joblib')
     sequence_length = 50
-    input_size = 9
-    hidden_size = 9
+    input_size = 8
+    hidden_size = 8
     fc_size = 8
+    target_seq = 25
+
     num_layers = 2
     output_size = 1
+    test_xls = "test/10.xls"
     # 加载已经训练好的模型
-    model_rnn, device = load_model_rnn(model_rnn_path='model_gru_time.pth', input_size=input_size,
-                                       hidden_size=hidden_size,
-                                       num_layers=num_layers, fc_size=fc_size,
-                                       output_size=output_size, net=GRU)
-    test_xls = "test/20.xls"
+    model_mlp, device = predict_xls_mlp.load_model_mlp('model_mlp.pth', input_size=input_size)
+    model_rnn, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_birnn_all.pth', input_size=input_size,
+                                                       hidden_size=hidden_size,
+                                                       num_layers=num_layers, fc_size=fc_size,
+                                                       output_size=output_size, net=BiRNN)
+    model_gru, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_bigru_all.pth', input_size=input_size,
+                                                       hidden_size=hidden_size,
+                                                       num_layers=num_layers, fc_size=fc_size,
+                                                       output_size=output_size, net=BiGRU)
+    model_lstm, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_bistm_all.pth', input_size=input_size,
+                                                        hidden_size=hidden_size,
+                                                        num_layers=num_layers, fc_size=fc_size,
+                                                        output_size=output_size, net=BiLSTM)
+    input_data_mlp = predict_xls_mlp.load_test_data_mlp(test_xls, scaler, device, column_xls='columns.xlsx')
+    input_tensor_rnn, output = predict_rnn_xls.load_test_data_rnn(test_xls, scaler, device, column_xls='columns.xlsx',
+                                                                  sequence_length=sequence_length)
+    mlp_out = predict_xls_mlp.predict_temperature_mlp(model_mlp, input_data_mlp)
+    rnn_out = predict_rnn_xls.predict_temperature_rnn(model_rnn, input_tensor_rnn,
+                                                      sequence_length=sequence_length,
+                                                      input_size=input_size)
+    gru_out = predict_rnn_xls.predict_temperature_rnn(model_gru, input_tensor_rnn,
+                                                      sequence_length=sequence_length,
+                                                      input_size=input_size)
+    lstm_out = predict_rnn_xls.predict_temperature_rnn(model_lstm, input_tensor_rnn,
+                                                       sequence_length=sequence_length,
+                                                       input_size=input_size)
 
-    input_tensor_rnn, output = load_test_data_rnn(test_xls, scaler, device, column_xls='columns.xlsx',
-                                                  sequence_length=sequence_length)
-    output_data_list = predict_temperature_rnn(model_rnn, input_tensor_rnn,
-                                               sequence_length=sequence_length,
-                                               input_size=input_size)
     # 可视化预测结果和原始值
-    index = range(len(output_data_list))
-    np_out = np.asarray(output_data_list).reshape(-1)
-    plt.plot(index, np_out, label='GT_Temp')
-    plt.plot(index, output[sequence_length - 1:-1], label='Predicted GT_Temp')
-    plt.legend()
+    plot_length = 6000
+    index_rnn = range(target_seq - 1, min(plot_length, len(rnn_out) + target_seq - 1))
+    index_mlp = range(min(plot_length, len(mlp_out)))
+    np_mlp_out_all = np.asarray(mlp_out).reshape(-1)
+    np_rnn_out_all = np.asarray(rnn_out).reshape(-1)
+    np_gru_out_all = np.asarray(gru_out).reshape(-1)
+    np_lstm_out_all = np.asarray(lstm_out).reshape(-1)
+
+    np_mlp_out = np.asarray(mlp_out[:plot_length]).reshape(-1)
+    np_rnn_out = np.asarray(rnn_out[:plot_length]).reshape(-1)
+    np_gru_out = np.asarray(gru_out[:plot_length]).reshape(-1)
+    np_lstm_out = np.asarray(lstm_out[:plot_length]).reshape(-1)
+
+    mlp_ratio = 0.2
+    rnn_ratio = 0.2
+    gru_ratio = 0.3
+    lstm_ratio = 0.3
+    hybrid_out = np.zeros(len(np_mlp_out_all))
+    hybrid_out[:target_seq] = np_mlp_out[:target_seq]
+    hybrid_out[-target_seq:-1] = np_mlp_out[-target_seq:-1]
+    hybrid_out[target_seq:-target_seq-1] = rnn_ratio * np_rnn_out_all[:] + mlp_ratio * np_mlp_out_all[sequence_length:] \
+                                   + gru_ratio * np_gru_out_all[:] + lstm_ratio * np_lstm_out_all[:]
+    # 计算每个预测数组和其对应的真实值数组之间的均方根损失
+    mlp_rmse = mean_squared_error(output, np_mlp_out_all, squared=False)
+    rnn_rmse = mean_squared_error(output[target_seq:-target_seq], np_rnn_out_all,
+                                  squared=False)
+    gru_rmse = mean_squared_error(output[target_seq:-target_seq], np_gru_out_all,
+                                  squared=False)
+    lstm_rmse = mean_squared_error(output[target_seq:-target_seq], np_lstm_out_all,
+                                   squared=False)
+    hybrid_rmse = mean_squared_error(output[:], hybrid_out[:], squared=False)
+
+    # 创建画布和两个子图
+    fig, (ax1, ax2) = plt.subplots(nrows=2, figsize=(10, 8))
+
+    ax1.plot(index_rnn, np_rnn_out[:plot_length - (target_seq - 1)], label='RNN_Temp')
+    ax1.plot(index_rnn, np_gru_out[:plot_length - (target_seq - 1)], label='GRU_Temp')
+    ax1.plot(index_rnn, np_lstm_out[:plot_length - (target_seq - 1)], label='LSTM_Temp')
+
+    if np.any(output):
+        ax1.plot(index_mlp, output[:plot_length], label='GT_Temp')
+    else:
+        print("all of output if '0'")
+    ax1.plot(index_mlp, np_mlp_out[:], label='MLP_Temp')
+    ax1.plot(index_mlp, hybrid_out[:plot_length], label='Hybrid_Temp')
+    ax1.legend()
+
+    # 在第二个子图中绘制表格
+    table_data = [['Model', 'RMSE'],
+                  ['MLP', f'{mlp_rmse:.3f}'],
+                  ['RNN', f'{rnn_rmse:.3f}'],
+                  ['GRU', f'{gru_rmse:.3f}'],
+                  ['LSTM', f'{lstm_rmse:.3f}'],
+                  ['Hybrid', f'{hybrid_rmse:.3f}']]
+    ax2.axis('off')
+    ax2.table(cellText=table_data, colLabels=None, cellLoc='center', loc='center')
+
+    # 调整布局
+    plt.subplots_adjust(hspace=0)
+
+    plt.savefig(os.path.join("result", f'{Path(test_xls).stem}_{plot_length}.png'), dpi=300,
+                bbox_inches='tight')  # 保存图片为png格式，分辨率为300，裁剪掉多余的空白
     plt.show()
-    add_predict_data(test_xls=test_xls, output_data_list=output_data_list, sequence_length=sequence_length)
+
+    # 打印均方根损失
+    print(f'MLP RMSE:{mlp_rmse:.3f}')
+    print(f'RNN RMSE:{rnn_rmse:.3f}')
+    print(f'GRU RMSE:{gru_rmse:.3f}')
+    print(f'LSTM RMSE:{lstm_rmse:.3f}')
+    print(f'Hybrid RMSE:{hybrid_rmse:.3f}')
+
+    add_predict_data(test_xls=test_xls, output_data_list=hybrid_out)
