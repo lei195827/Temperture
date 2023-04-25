@@ -36,7 +36,7 @@ if __name__ == '__main__':
 
     num_layers = 2
     output_size = 1
-    test_xls = "test/12.xls"
+    test_xls = "test/8.xls"
     # 加载已经训练好的模型
     model_mlp, device = predict_xls_mlp.load_model_mlp('model_mlp.pth', input_size=input_size)
     model_rnn, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_rnn.pth', input_size=input_size,

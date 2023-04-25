@@ -36,8 +36,8 @@ if __name__ == '__main__':
 
     num_layers = 2
     output_size = 1
-    test_xls = "train/25.xls"
-    unstable = True
+    test_xls = "test/10.xls"
+    unstable = False
     # 加载已经训练好的模型
     model_mlp, device = predict_xls_mlp.load_model_mlp('model_mlp.pth', input_size=input_size)
     model_rnn, device = predict_rnn_xls.load_model_rnn(model_rnn_path='model_birnn_all.pth', input_size=input_size,
@@ -95,7 +95,7 @@ if __name__ == '__main__':
 
     # 可视化预测结果和原始值
     print(f'output.var():{output.var()}')
-    plot_length = 10000
+    plot_length = 9900
     if unstable:
         index_rnn_unstable = range(target_seq - 1, min(plot_length, len(rnn_out) + target_seq - 1))
         index_mlp_unstable = range(min(plot_length, len(mlp_out)))
@@ -151,7 +151,7 @@ if __name__ == '__main__':
         hybrid_out_unstable[-target_seq:] = np_mlp_out[-target_seq:]
         hybrid_out_unstable[target_seq:-target_seq] = rnn_ratio_unstable * np_rnn_out_unstable[:] + \
         gru_ratio_unstable * np_gru_out_unstable[:] + lstm_ratio_unstable * np_lstm_out_unstable[:]
-        hybrid_out_unstable = 0.2*hybrid_out+0.8*hybrid_out_unstable
+        hybrid_out_unstable = 0.6*hybrid_out+0.4*hybrid_out_unstable
         rnn_rmse_unstable = mean_squared_error(output[target_seq:-target_seq], np_rnn_out_unstable,
                                       squared=False)
         gru_rmse_unstable = mean_squared_error(output[target_seq:-target_seq], np_gru_out_unstable,
